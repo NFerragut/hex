@@ -57,9 +57,9 @@ _EXPECTED_IHEX_DATA_COUNT = {
 class FileContentError(HexError):
     """Base error for errors found in hex files."""
 
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.filename = ''
+    def __init__(self, message, filename=''):
+        super().__init__(message)
+        self.filename = filename
         self.line_text = ''
         self.line_number = None
 
@@ -303,11 +303,7 @@ class Memory:
             the number of data records.
         """
         if not self._segments:
-            # TODO: Optimize code to a single line
-            #       raise DataNotFoundError('No data to write.', filename)
-            error = DataNotFoundError('No data to write.')
-            error.filename = filename
-            raise error
+            raise DataNotFoundError('No data to write.', filename)
         if not output_format:
             output_format = format_from_extension(filename)
         if not overwrite and os.path.exists(filename):
