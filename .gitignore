@@ -17,3 +17,6 @@ dist/
 htmlcov/
 .coverage
 .pytest_cache/
+
+# Project-specific ignores
+deleteme/
