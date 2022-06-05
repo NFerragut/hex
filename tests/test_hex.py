@@ -34,9 +34,9 @@ class Test0CommandLine():
         assert app.returncode == 0
 
     @staticmethod
-    def test_help(app: RunApplication):
+    def test_help(app: RunApplication, opt_help):
         """Hex help option should show help text."""
-        app.run('-h')
+        app.run(opt_help)
         assert app.stdoutlines == [
             'usage: hex.py [-h] [--version] [-a] [-d] [-f DATA] [-k [ADDR-ADDR ...]]',
             '              [-r [ADDR-ADDR ...]] [-v VAL[@ADDR] [VAL[@ADDR] ...]]',
@@ -160,10 +160,10 @@ class Test0ReadInputFiles():
         assert app.returncode == 1
 
     @staticmethod
-    def test_read_srec32_allow_overlap_diff(app: RunApplication):
+    def test_read_srec32_allow_overlap_diff(app: RunApplication, opt_overwrite_data):
         """Hex with allow overlap option should accept overlapping data that is different."""
         app.run('tests/files/alphabet.s37', 'tests/files/alpha-overlap-diff.s37',
-                '-d')
+                opt_overwrite_data)
         assert app.stdoutlines == [
             '00000100  41 42 43 44 45 46 47 48  31 32 33 34 35 36 37 38  |ABCDEFGH12345678|',
             '00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
@@ -187,11 +187,12 @@ class Test0ReadInputFiles():
         assert app.returncode == 1
 
     @staticmethod
-    def test_read_overwrite_previous_start_address(app: RunApplication):
+    def test_read_overwrite_previous_start_address(app: RunApplication,
+                                                   opt_overwrite_start_address, opt_srec):
         """Hex with last start address option should use the last of multiple start addresses."""
         app.run('tests/files/alphabet.s37',
                 'tests/files/alphabet.s28',
-                '-a', '-S')
+                opt_overwrite_start_address, opt_srec)
         assert app.stdoutlines == [
             'S00600004844521B',
             'S315000001004142434445464748494A4B4C4D4E4F5061',
@@ -376,59 +377,59 @@ class Test1ModifyMemoryOptions():
     """Unit tests focused on modifying bytes using command-line options."""
 
     @staticmethod
-    def test_create_data(app: RunApplication):
+    def test_create_data(app: RunApplication, opt_write_data):
         """Create data option should insert data in memory at address 0."""
-        app.run('-w', '4142434445464748494A4b4C4d')
+        app.run(opt_write_data, '4142434445464748494A4b4C4d')
         assert app.stdout == \
             '00000000  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d           |ABCDEFGHIJKLM|'
         assert app.stderr == ''
         assert app.returncode == 0
 
     @staticmethod
-    def test_create_data_at_address(app: RunApplication):
+    def test_create_data_at_address(app: RunApplication, opt_write_data):
         """Create data option with address should insert data in memory at the specified address."""
-        app.run('-w', '4142434445464748494A4b4C4d4E4f50@FfFFfFF0')
+        app.run(opt_write_data, '4142434445464748494A4b4C4d4E4f50@FfFFfFF0')
         assert app.stdout == \
             'fffffff0  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|'
         assert app.stderr == ''
         assert app.returncode == 0
 
     @staticmethod
-    def test_create_data_at_address_out_of_range(app: RunApplication):
+    def test_create_data_at_address_out_of_range(app: RunApplication, opt_write_data):
         """Create data option should show an error if memory is not 32-bit addressable."""
-        app.run('-w', '4142434445464748494A4b4C4d4E4f50@FFFFFFFC')
+        app.run(opt_write_data, '4142434445464748494A4b4C4d4E4f50@FFFFFFFC')
         assert app.stdout == ''
         assert app.stderr == 'ERROR: Address used (0x10000000B) exceeds 32-bit address space'
         assert app.returncode == 1
 
     @staticmethod
-    def test_create_value(app: RunApplication):
+    def test_create_value(app: RunApplication, opt_write_value):
         """Create value option should insert little-endian value in memory at address 0."""
-        app.run('-v', '12345678')
+        app.run(opt_write_value, '12345678')
         assert app.stdout == '00000000  78 56 34 12                                       |xV4.|'
         assert app.stderr == ''
         assert app.returncode == 0
 
     @staticmethod
-    def test_create_value_at_address(app: RunApplication):
+    def test_create_value_at_address(app: RunApplication, opt_write_value):
         """Create value option with address should insert value in memory at specified address."""
-        app.run('-v', '12345678@FfFFfFFc')
+        app.run(opt_write_value, '12345678@FfFFfFFc')
         assert app.stdout == 'fffffffc  78 56 34 12                                       |xV4.|'
         assert app.stderr == ''
         assert app.returncode == 0
 
     @staticmethod
-    def test_create_value_at_address_out_of_range(app: RunApplication):
+    def test_create_value_at_address_out_of_range(app: RunApplication, opt_write_value):
         """Create value option should show an error if memory is not 32-bit addressable."""
-        app.run('-v', '12345678@FFFFFFFD')
+        app.run(opt_write_value, '12345678@FFFFFFFD')
         assert app.stdout == ''
         assert app.stderr == 'ERROR: Address used (0x100000000) exceeds 32-bit address space'
         assert app.returncode == 1
 
     @staticmethod
-    def test_fill(app: RunApplication):
+    def test_fill(app: RunApplication, opt_fill):
         """Fill option should fill memory gaps."""
-        app.run('tests/files/alpha-gap.s37', '-f', '3A2d29')
+        app.run('tests/files/alpha-gap.s37', opt_fill, '3A2d29')
         assert app.stdoutlines == [
             '7fffffd0  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
             '7fffffe0  51 52 53 54 55 56 57 58  59 5a 3a 2d 29 3a 2d 29  |QRSTUVWXYZ:-):-)|',
@@ -440,9 +441,10 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_keep(app: RunApplication):
+    def test_keep(app: RunApplication, opt_keep):
         """Keep option should keep selected memory ranges and discard the rest."""
-        app.run('tests/files/alphabet.s37', '-k', '100-103', '10c-8000000D', '80000016-80000019')
+        app.run('tests/files/alphabet.s37',
+                opt_keep, '100-103', '10c-8000000D', '80000016-80000019')
         assert app.stdoutlines == [
             '00000100  41 42 43 44                                       |ABCD|',
             '0000010c  4d 4e 4f 50 51 52 53 54  55 56 57 58 59 5a        |MNOPQRSTUVWXYZ|',
@@ -453,18 +455,18 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_keep_single_byte(app: RunApplication):
+    def test_keep_single_byte(app: RunApplication, opt_keep):
         """Keep option should keep a single byte if range does not use dash ('-')."""
-        app.run('tests/files/alphabet.s37', '-k', '100')
+        app.run('tests/files/alphabet.s37', opt_keep, '100')
         assert app.stdout == \
             '00000100  41                                                |A|'
         assert app.stderr == ''
         assert app.returncode == 0
 
     @staticmethod
-    def test_keep_whole_segment(app: RunApplication):
+    def test_keep_whole_segment(app: RunApplication, opt_keep):
         """Keep option should keep a intact segment of the memory."""
-        app.run('tests/files/alphabet.s37', '-k', '100-120')
+        app.run('tests/files/alphabet.s37', opt_keep, '100-120')
         assert app.stdoutlines == [
             '00000100  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
             '00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
@@ -473,17 +475,18 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_keep_with_empty_result(app: RunApplication):
+    def test_keep_with_empty_result(app: RunApplication, opt_keep):
         """Hex keep should generate an error message if all memory is discarded."""
-        app.run('tests/files/alphabet.s37', '-k', '8000-20000')
+        app.run('tests/files/alphabet.s37', opt_keep, '8000-20000')
         assert app.stdout == ''
         assert app.stderr == 'WARNING: No output memory -- all memory removed by user options'
         assert app.returncode == 0
 
     @staticmethod
-    def test_remove(app: RunApplication):
+    def test_remove(app: RunApplication, opt_remove):
         """Remove option should remove selected memory ranges and keep the rest."""
-        app.run('tests/files/alphabet.s37', '-r', '104-10B', '116-80000003', '8000000e-80000015')
+        app.run('tests/files/alphabet.s37',
+                opt_remove, '104-10B', '116-80000003', '8000000e-80000015')
         assert app.stdoutlines == [
             '00000100  41 42 43 44                                       |ABCD|',
             '0000010c  4d 4e 4f 50 51 52 53 54  55 56                    |MNOPQRSTUV|',
@@ -494,9 +497,9 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_remove_single_byte(app: RunApplication):
+    def test_remove_single_byte(app: RunApplication, opt_remove):
         """Remove option should remove a single byte if range does not use dash ('-')."""
-        app.run('tests/files/alphabet.s37', '-r', '100')
+        app.run('tests/files/alphabet.s37', opt_remove, '100')
         assert app.stdoutlines == [
             '00000101  42 43 44 45 46 47 48 49  4a 4b 4c 4d 4e 4f 50 51  |BCDEFGHIJKLMNOPQ|',
             '00000111  52 53 54 55 56 57 58 59  5a                       |RSTUVWXYZ|',
@@ -507,9 +510,9 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_remove_with_empty_result(app: RunApplication):
+    def test_remove_with_empty_result(app: RunApplication, opt_remove):
         """Hex remove should generate an error message if all memory is removed."""
-        app.run('tests/files/alphabet.s37', '-r', '0-90000000')
+        app.run('tests/files/alphabet.s37', opt_remove, '0-90000000')
         assert app.stdout == ''
         assert app.stderr == 'WARNING: No output memory -- all memory removed by user options'
         assert app.returncode == 0
@@ -519,9 +522,9 @@ class Test2FormatOutput():
     """Unit tests focused on formatting the output content."""
 
     @staticmethod
-    def test_srec_option(app: RunApplication):
+    def test_srec_option(app: RunApplication, opt_srec):
         """Hex SREC option should show SREC format on console."""
-        app.run('tests/files/alphabet.hex', '-S')
+        app.run('tests/files/alphabet.hex', opt_srec)
         assert app.stdoutlines == [
             'S315000001004142434445464748494A4B4C4D4E4F5061',
             'S30F000001105152535455565758595A88',
@@ -533,9 +536,9 @@ class Test2FormatOutput():
         assert app.returncode == 0
 
     @staticmethod
-    def test_srec_with_no_start(app: RunApplication):
+    def test_srec_with_no_start(app: RunApplication, opt_srec):
         """Hex should generate SREC32 without start address if none given."""
-        app.run('tests/files/alphabet-nostart.hex', '-S')
+        app.run('tests/files/alphabet-nostart.hex', opt_srec)
         assert app.stdoutlines == [
             'S315000001004142434445464748494A4B4C4D4E4F5061',
             'S30F000001105152535455565758595A88',
@@ -546,9 +549,9 @@ class Test2FormatOutput():
         assert app.returncode == 0
 
     @staticmethod
-    def test_srec_with_record_count(app: RunApplication):
+    def test_srec_with_record_count(app: RunApplication, opt_srec):
         """Hex should generate SREC32 with a record count."""
-        app.run('tests/files/alphabet.hex', '-S', '--record-count')
+        app.run('tests/files/alphabet.hex', opt_srec, '--record-count')
         assert app.stdoutlines == [
             'S315000001004142434445464748494A4B4C4D4E4F5061',
             'S30F000001105152535455565758595A88',
@@ -561,9 +564,9 @@ class Test2FormatOutput():
         assert app.returncode == 0
 
     @staticmethod
-    def test_ihex_option(app: RunApplication):
+    def test_ihex_option(app: RunApplication, opt_ihex):
         """Hex IHEX option should show IHEX format on console."""
-        app.run('tests/files/alphabet.s37', '-I')
+        app.run('tests/files/alphabet.s37', opt_ihex)
         assert app.stdoutlines == [
             ':100100004142434445464748494A4B4C4D4E4F5067',
             ':0A0110005152535455565758595A8E',
@@ -577,9 +580,9 @@ class Test2FormatOutput():
         assert app.returncode == 0
 
     @staticmethod
-    def test_ihex_with_no_start(app: RunApplication):
+    def test_ihex_with_no_start(app: RunApplication, opt_ihex):
         """Hex should generate IHEX without start address if none given."""
-        app.run('tests/files/alphabet-nostart.s37', '-I')
+        app.run('tests/files/alphabet-nostart.s37', opt_ihex)
         assert app.stdoutlines == [
             ':100100004142434445464748494A4B4C4D4E4F5067',
             ':0A0110005152535455565758595A8E',
@@ -592,9 +595,9 @@ class Test2FormatOutput():
         assert app.returncode == 0
 
     @staticmethod
-    def test_bin_option_on_console(app: RunApplication):
+    def test_bin_option_on_console(app: RunApplication, opt_binary):
         """Hex should ignore binary option and show hex dump for console output."""
-        app.run('tests/files/alphabet.s37', '-B')
+        app.run('tests/files/alphabet.s37', opt_binary)
         assert app.stdoutlines == [
             '00000100  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
             '00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
@@ -609,11 +612,11 @@ class Test3WriteOutputFile():
     """Unit tests focused on writing the output file."""
 
     @staticmethod
-    def test_format_srec16_output_by_extension(app: RunApplication):
+    def test_format_srec16_output_by_extension(app: RunApplication, opt_output):
         """Hex should generate SREC16 output based on the outfile extension."""
         for ext in _EXTENSIONS_SREC_16:
             outfile = f'tests/files/output.{ext}'
-            app.run('tests/files/alphabet.hex', '-o', outfile, '--overwrite')
+            app.run('tests/files/alphabet.hex', opt_output, outfile, '--overwrite')
             assert app.stdout == ''
             assert app.stderr == ''
             assert app.returncode == 0
@@ -621,11 +624,11 @@ class Test3WriteOutputFile():
             os.remove(outfile)
 
     @staticmethod
-    def test_format_srec24_output_by_extension(app: RunApplication):
+    def test_format_srec24_output_by_extension(app: RunApplication, opt_output):
         """Hex should generate SREC24 output based on the outfile extension."""
         for ext in _EXTENSIONS_SREC_24:
             outfile = f'tests/files/output.{ext}'
-            app.run('tests/files/alphabet.hex', '-o', outfile, '--overwrite')
+            app.run('tests/files/alphabet.hex', opt_output, outfile, '--overwrite')
             assert app.stdout == ''
             assert app.stderr == ''
             assert app.returncode == 0
@@ -633,11 +636,11 @@ class Test3WriteOutputFile():
             os.remove(outfile)
 
     @staticmethod
-    def test_format_srec32_output_by_extension(app: RunApplication):
+    def test_format_srec32_output_by_extension(app: RunApplication, opt_output):
         """Hex should generate SREC32 output based on the outfile extension."""
         for ext in _EXTENSIONS_SREC:
             outfile = f'tests/files/output.{ext}'
-            app.run('tests/files/alphabet.hex', '-o', outfile, '--overwrite')
+            app.run('tests/files/alphabet.hex', opt_output, outfile, '--overwrite')
             assert app.stdout == ''
             assert app.stderr == ''
             assert app.returncode == 0
@@ -645,10 +648,10 @@ class Test3WriteOutputFile():
             os.remove(outfile)
 
     @staticmethod
-    def test_write_file_force_srec_format(app: RunApplication):
+    def test_write_file_force_srec_format(app: RunApplication, opt_output, opt_srec):
         """Hex write with SREC format option should ignore output filename extension."""
         outfile = 'tests/files/output.bin'
-        app.run('tests/files/alphabet.hex', '-o', outfile, '--overwrite', '-S')
+        app.run('tests/files/alphabet.hex', opt_output, outfile, '--overwrite', opt_srec)
         assert app.stdout == ''
         assert app.stderr == ''
         assert app.returncode == 0
@@ -656,11 +659,11 @@ class Test3WriteOutputFile():
         os.remove(outfile)
 
     @staticmethod
-    def test_format_ihex_output_by_extension(app: RunApplication):
+    def test_format_ihex_output_by_extension(app: RunApplication, opt_output):
         """Hex should generate IHEX output based on the outfile extension."""
         for ext in _EXTENSIONS_IHEX:
             outfile = f'tests/files/output.{ext}'
-            app.run('tests/files/alphabet.s37', '-o', outfile, '--overwrite')
+            app.run('tests/files/alphabet.s37', opt_output, outfile, '--overwrite')
             assert app.stdout == ''
             assert app.stderr == ''
             assert app.returncode == 0
@@ -668,10 +671,10 @@ class Test3WriteOutputFile():
             os.remove(outfile)
 
     @staticmethod
-    def test_write_file_force_ihex_format(app: RunApplication):
+    def test_write_file_force_ihex_format(app: RunApplication, opt_output, opt_ihex):
         """Hex write with IHEX format option should ignore output filename extension."""
         outfile = 'tests/files/output.bin'
-        app.run('tests/files/alphabet.s37', '-o', outfile, '--overwrite', '-I')
+        app.run('tests/files/alphabet.s37', opt_output, outfile, '--overwrite', opt_ihex)
         assert app.stdout == ''
         assert app.stderr == ''
         assert app.returncode == 0
@@ -679,11 +682,11 @@ class Test3WriteOutputFile():
         os.remove(outfile)
 
     @staticmethod
-    def test_format_hex_dump_output_by_extension(app: RunApplication):
+    def test_format_hex_dump_output_by_extension(app: RunApplication, opt_output):
         """Hex should generate hex dump output based on the outfile extension."""
         for ext in ['png', 'txt', 'xml']:
             outfile = f'tests/files/output.{ext}'
-            app.run('tests/files/alphabet.hex', '-o', outfile, '--overwrite')
+            app.run('tests/files/alphabet.hex', opt_output, outfile, '--overwrite')
             assert app.stdout == ''
             assert app.stderr == ''
             assert app.returncode == 0
@@ -691,11 +694,11 @@ class Test3WriteOutputFile():
             os.remove(outfile)
 
     @staticmethod
-    def test_format_binary_output_by_extension(app: RunApplication):
+    def test_format_binary_output_by_extension(app: RunApplication, opt_output):
         """Hex should generate binary output based on the outfile extension."""
         for ext in _EXTENSIONS_BIN:
             outfile = f'tests/files/output.{ext}'
-            app.run('tests/files/alphabet.s37', '-o', outfile, '--overwrite')
+            app.run('tests/files/alphabet.s37', opt_output, outfile, '--overwrite')
             assert app.stdout == ''
             assert app.stderr == ''
             assert app.returncode == 0
@@ -703,26 +706,23 @@ class Test3WriteOutputFile():
             os.remove(outfile)
 
     @staticmethod
-    def test_write_file_force_binary_format(app: RunApplication):
+    def test_write_file_force_binary_format(app: RunApplication, opt_output, opt_binary):
         """Hex write with binary format option should ignore output filename extension."""
         outfile = 'tests/files/output.hex'
-        app.run('tests/files/alphabet.s37', '-o', outfile, '--overwrite', '-B')
+        app.run('tests/files/alphabet.s37', opt_output, outfile, '--overwrite', opt_binary)
         assert app.stdout == ''
         assert app.stderr == ''
         assert app.returncode == 0
         assert filecmp.cmp(outfile, 'tests/files/alphabet.bin')
-        # with open(outfile, 'rb') as fin:
-        #     contents = fin.read()
-        # assert contents == b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
         os.remove(outfile)
 
     @staticmethod
-    def test_write_file_exists_error(app: RunApplication):
+    def test_write_file_exists_error(app: RunApplication, opt_output):
         """Hex write should not write the file and show an error if the output file exists."""
         outfile = 'tests/files/already-exists.txt'
         create_file(outfile)
         outstat = os.stat(outfile)
-        app.run('tests/files/alphabet.s37', '-o', outfile)
+        app.run('tests/files/alphabet.s37', opt_output, outfile)
         assert app.stdout == ''
         assert app.stderr == \
             f'ERROR: "{outfile}" already exists. Use --overwrite option to overwrite.'
@@ -731,12 +731,12 @@ class Test3WriteOutputFile():
         os.remove(outfile)
 
     @staticmethod
-    def test_write_file_with_overwrite_option(app: RunApplication):
+    def test_write_file_with_overwrite_option(app: RunApplication, opt_output):
         """Hex write with overwrite option should overwrite an existing file."""
         outfile = 'tests/files/output.s37'
         create_file(outfile)
         outstat = os.stat(outfile)
-        app.run('tests/files/alphabet.s37', '-o', outfile, '--overwrite')
+        app.run('tests/files/alphabet.s37', opt_output, outfile, '--overwrite')
         assert app.stdout == ''
         assert app.stderr == ''
         assert app.returncode == 0
