@@ -2,7 +2,6 @@
 
 import filecmp
 import os
-import subprocess
 
 from run_application import RunApplication
 
@@ -13,22 +12,6 @@ _EXTENSIONS_IHEX = ['hex', 'pc8']
 _EXTENSIONS_SREC_16 = ['s1', 's19']
 _EXTENSIONS_SREC_24 = ['s2', 's28']
 _EXTENSIONS_SREC = ['s', 's3', 's37']
-_TIMEOUT = 5000
-
-
-def runhex(*args):
-    """Helper function to run hex.py on the command line and capture the results."""
-    command = ['python', 'src/hex.py']
-    if args:
-        command += args
-    result = subprocess.run(command, capture_output=True, timeout=_TIMEOUT, check=False)
-    stdout = str(result.stdout, encoding='utf-8').splitlines()
-    if len(stdout) < 2:
-        stdout = '' if len(stdout) == 0 else stdout[0]
-    stderr = str(result.stderr, encoding='utf-8').splitlines()
-    if len(stderr) < 2:
-        stderr = '' if len(stderr) == 0 else stderr[0]
-    return (stdout, stderr, result.returncode)
 
 
 def create_file(filename):
