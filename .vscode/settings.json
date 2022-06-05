@@ -2,8 +2,6 @@
   "python.analysis.extraPaths": [
     "src"
   ],
-  "python.linting.pylamaEnabled": true,
-  "python.linting.enabled": true,
   "LWI.breakpoints": [
     {
       "column": 58,

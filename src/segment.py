@@ -15,6 +15,22 @@ _SEGMENTS_HAVE_GAP = 1
 class DataCollisionError(HexError):
     """Attempted to combine data segments that overlap without selecting the overwrite option."""
 
+    def __init__(self, address, data_old, data_new):
+        super().__init__()
+        self.filename = ''
+        self.address = address
+        self.data_new = data_new
+        self.data_old = data_old
+
+    def __str__(self):
+        out = [
+            f'ERROR: In file "{self.filename}"',
+            f'       The data at 0x{self.address:X} (0x{self.data_new:02X}) conflicts with '
+                f'previously defined data (0x{self.data_old:02X})',
+            '       Consider using the --overwrite-data option'
+        ]
+        return '\n'.join(out)
+
 
 class NonSequentialDataError(HexError):
     """Segments can only be combined if they overlap or they have no gap between them."""
@@ -24,7 +40,7 @@ class Segment:
     """A memory segment with a start address and consecutively defined bytes."""
 
     def __init__(self, data=None, addrlo: int = 0):
-        "Create a Segment object."
+        """Create a Segment object."""
         if isinstance(data, Segment):
             self._addrlo = data.addrlo
             self._data = data.data
@@ -37,11 +53,11 @@ class Segment:
     def _validate(self):
         """Validate that the location of the data does not overflow the 32-bit address range."""
         if self._addrlo < 0:
-            raise ValueError(f'Memory address is too low (as low as {self._addrlo}).')
+            raise ValueError(f'ERROR: Address used ({self._addrlo}) is negative')
         datalen = len(self._data)
         addrlast = self._addrlo + (datalen - 1 if datalen > 0 else 0)
         if addrlast.bit_length() > 32:
-            raise ValueError(f'Memory address is too high (up to 0x{addrlast:X})')
+            raise ValueError(f'ERROR: Address used (0x{addrlast:X}) exceeds 32-bit address space')
 
     @property
     def addrhi(self) -> int:
@@ -69,8 +85,6 @@ class Segment:
         """Set the data in the segment."""
         if value is None:
             self._data = b''
-        elif isinstance(value, int):
-            self._data = bytes([value])
         else:
             self._data = bytes(value)
         self._validate()
@@ -91,7 +105,9 @@ class Segment:
         """
         if self.overlaps(segment):
             if not overwrite:
-                raise DataCollisionError(self, segment)
+                conflict = self._conflicting_data(segment)
+                if conflict is not None:
+                    raise DataCollisionError(*conflict)
             if self.addrlo <= segment.addrlo:
                 # Overlap:  1--2====2--1 where 1=self, 2=segment
                 self.data = self.data[:segment.addrlo - self.addrlo] + \
@@ -110,6 +126,19 @@ class Segment:
         else:
             raise NonSequentialDataError(self, segment)
         return self
+
+    def _conflicting_data(self, segment: 'Segment'):
+        """Get ()address, new_data, old_data) for the first conflicting byte."""
+        addrlo = max(self.addrlo, segment.addrlo)
+        addrhi = min(self.addrhi, segment.addrhi)
+        local = self.subsegment(addrlo, addrhi).data
+        remote = segment.subsegment(addrlo, addrhi).data
+        index = next((i
+                      for i in range(len(local))
+                      if local[i] != remote[i]), None)
+        if index is None:
+            return None
+        return addrlo + index, local[index], remote[index]
 
     def isadjacent(self, segment: 'Segment') -> bool:
         """Return True if the specified segment is adjacent (no gaps) to this segment."""

@@ -1,16 +1,16 @@
 """memory.py -- The memory from hex and binary files."""
 
-import os
 import re
 
 from exception import HexError
 from segment import Segment
 from segments import Segments
 
-FORMAT_BIN = 'binary'
-FORMAT_DUMP = 'hex-dump'
-FORMAT_IHEX = 'intel-hex'
-FORMAT_SREC = 'motorola-s'
+FORMAT_BIN = '01'
+FORMAT_DUMP = 'hexdump'
+FORMAT_IHEX = 'ihex'
+FORMAT_SREC = 'srec'
+FORMAT_SREC_WITH_REC_COUNT = 'srec+count'
 
 _IHEX_DATA = 0
 _IHEX_END_OF_FILE = 1
@@ -57,41 +57,66 @@ _EXPECTED_IHEX_DATA_COUNT = {
 class FileContentError(HexError):
     """Base error for errors found in hex files."""
 
-    def __init__(self, message, filename=''):
+    def __init__(self, message, column_number=None, line_number=None, filename=''):
         super().__init__(message)
         self.filename = filename
+        self.column_number = column_number
+        self.line_number = line_number
         self.line_text = ''
-        self.line_number = None
 
     def __str__(self):
-        if self.args[0]:
-            out = []
-            if self.filename:
-                out.append(f'In file "{self.filename}"')
-                if self.line_number is not None:
-                    out[0] += f' (line {self.line_number})'
+        out = []
+        if self.filename:
+            out.append(f'In file "{self.filename}"')
+            if self.line_number is not None:
+                out[0] += f' (line {self.line_number})'
             if self.line_text:
-                out.append(f'       {self.line_text}')
-            if out:
-                out.append('       ')
-            return '\n'.join(out) + self.args[0]
-        return str(super())
+                out.append(self.line_text)
+                if self.column_number is not None:
+                    column_indent = ' ' * self.column_number
+                    out.append(f'{column_indent}^^')
+        out.append(self.args[0])
+        message = '\n       '.join(out)
+        return f'ERROR: {message}'
 
 
-class BadRecordValError(FileContentError):
+class BadRecordTypeError(FileContentError):
     """A record with an unsupported record type was found."""
+
+    def __init__(self, record_type, column_number):
+        super().__init__(
+            f'Invalid record type: {record_type} is not a valid record type',
+            column_number=column_number)
 
 
 class ChecksumError(FileContentError):
     """The checksum does not match the hex data."""
 
-
-class DataNotFoundError(FileContentError):
-    """The file has no data records."""
+    def __init__(self, expected_checksum, actual_checksum, column_number):
+        super().__init__(
+            f'Invalid checksum: calculated 0x{expected_checksum:02X}, '
+            f'but record has 0x{actual_checksum:02X}',
+            column_number=column_number)
 
 
 class RecordLengthError(FileContentError):
     """The length field does not match the length of the hex data."""
+
+    def __init__(self, expected_count, actual_count, column_number):
+        super().__init__(
+            f'Invalid byte count: record has 0x{expected_count:02X} bytes, '
+            f'but count set to 0x{actual_count:02X} bytes',
+            column_number=column_number)
+
+
+class RecordTypeLengthError(FileContentError):
+    """The length field does not match the expected length for the record type."""
+
+    def __init__(self, record_type, expected_count, actual_count, column_number):
+        super().__init__(
+            f'Invalid byte count: record type {record_type} '
+            f'expects 0x{expected_count:02X} bytes; actual 0x{actual_count:02X} bytes',
+            column_number=column_number)
 
 
 class StartAddressError(FileContentError):
@@ -101,15 +126,12 @@ class StartAddressError(FileContentError):
 class Memory:
     """The memory extracted from the input files."""
 
-    def __init__(self, source: str | Segments = None, *, allow_overlap=False):
+    def __init__(self, source: str = None, *, overwrite_data=False):
         self._header: list[bytes] = []
         self._segments: Segments = Segments()
         self._start_address: int = None
         if source is not None:
-            if isinstance(source, str):
-                self.read(source, allow_overlap=allow_overlap)
-            if isinstance(source, Segments):
-                self._segments.add(source, allow_overlap)
+            self.read(str(source), overwrite_data=overwrite_data)
 
     @property
     def is_empty(self) -> bool:
@@ -149,7 +171,7 @@ class Memory:
         if isinstance(memory, Segment):
             segments = [memory]
         elif isinstance(memory, Segments):
-            segments = memory
+            segments = memory._segments
         elif isinstance(memory, Memory):
             self.extend_header(memory.header)
             if memory.start_address is not None and memory.start_address != self.start_address:
@@ -162,8 +184,7 @@ class Memory:
             segments = memory._segments
         else:
             raise TypeError(f'Don\'t know how to add type "{type(memory).__name__}" to Memory.')
-        for seg in segments:
-            self._segments.add(seg, overwrite=overwrite)
+        self._segments.add(segments, overwrite=overwrite)
 
     def clear(self):
         """Clear the memory and its properties."""
@@ -182,7 +203,7 @@ class Memory:
         """Move all the memory to a new location."""
         self._segments.addrlo = address
 
-    def read(self, filename: str, *, allow_overlap=False):
+    def read(self, filename: str, *, overwrite_data=False):
         """Read an input file's data.
 
         Clears any previously loaded data.
@@ -193,22 +214,16 @@ class Memory:
 
         filename = Name of the input file
 
-        allow_overlap = False raises DataCollisionError if file memory overlaps itself
+        overwrite_data = Allows new data to overwrite older data
         """
         with open(filename, 'rb') as fin:
             binary = fin.read()
-        try:
-            text = binary.decode('utf-8', 'strict')
-            self.read_srec(text, allow_overlap=allow_overlap)
-            if not self._segments:
-                self.read_ihex(text, allow_overlap=allow_overlap)
-        except FileContentError as error:
-            error.filename = filename
-            raise
-        except UnicodeDecodeError:
-            pass
+        text = binary.decode('utf-8', 'strict')
+        self.read_srec(text, overwrite_data=overwrite_data)
         if not self._segments:
-            self.read_binary(binary)
+            self.read_ihex(text, overwrite_data=overwrite_data)
+            if not self._segments:
+                self.read_binary(binary)
 
     def read_binary(self, binary):
         """Replace memory with binary data."""
@@ -216,12 +231,12 @@ class Memory:
         self.clear()
         self._segments.add(seg)
 
-    def read_ihex(self, ihex: str, *, allow_overlap=False):
+    def read_ihex(self, ihex: str, *, overwrite_data=False):
         """Replace memory with Intel Hex data loaded from text.
 
         ihex = text for a Intel Hex file.
 
-        allow_overlap = False raises DataCollisionError if ihex memory overlaps itself
+        overwrite_data = Allows new data to overwrite older data
         """
         self.clear()
         self.start_address = None
@@ -234,7 +249,7 @@ class Memory:
                 rectype, address, data = _parse_ihex_line(found[0])
                 if rectype == _IHEX_DATA:
                     segment = Segment(data, extended_address + address)
-                    self._segments.add(segment, overwrite=allow_overlap)
+                    self._segments.add(segment, overwrite=overwrite_data)
                 elif rectype == _IHEX_EXTENDED_SEGMENT_ADDRESS:
                     extended_address = int.from_bytes(data, byteorder='big') << 4
                 elif rectype == _IHEX_START_SEGMENT_ADDRESS:
@@ -253,12 +268,12 @@ class Memory:
                 error.line_number = line_number
                 raise
 
-    def read_srec(self, srec: str, *, allow_overlap=False):
+    def read_srec(self, srec: str, *, overwrite_data=False):
         """Replace memory with Motorola S data loaded from text.
 
         srec = text for a Motorola S file.
 
-        allow_overlap = False raises DataCollisionError if srec memory overlaps itself
+        overwrite_data = Allows new data to overwrite older data
         """
         self.clear()
         self.start_address = None
@@ -272,7 +287,7 @@ class Memory:
                     self._header = [data]
                 elif rectype in [_SREC_A16_DATA, _SREC_A24_DATA, _SREC_A32_DATA]:
                     segment = Segment(data, address)
-                    self._segments.add(segment, overwrite=allow_overlap)
+                    self._segments.add(segment, overwrite=overwrite_data)
                 elif rectype in [_SREC_A16_START, _SREC_A24_START, _SREC_A32_START]:
                     self.start_address = address
                 # elif rectype in [_SREC_A16_COUNT, _SREC_A24_COUNT]:
@@ -284,8 +299,7 @@ class Memory:
                 error.line_number = line_number
                 raise
 
-    def write(self, filename: str, *, bytes_per_line=16, output_format='', overwrite=False,
-              show_count=False):
+    def write(self, fout, *, bytes_per_line=16, output_format=''):
         """Write memory to a file.
 
         The format of the output file is based on the filename extension, but it can be overridden
@@ -298,27 +312,17 @@ class Memory:
 
         output_format = Override the output format. Valid values are 'binary', 'hexdump', 'ihex',
             and 'srec'.
-
-        show_count = Only relevant for Motorola S (srec) format. Creates an S5 (or S6) record with
-            the number of data records.
         """
-        if not self._segments:
-            raise DataNotFoundError('No data to write.', filename)
-        if not output_format:
-            output_format = format_from_extension(filename)
-        if not overwrite and os.path.exists(filename):
-            raise FileExistsError(f'"{filename}" already exists. '
-                                  'Use --overwrite option to overwrite.')
-        mode = 'wb' if output_format == FORMAT_BIN else 'w'
-        with open(filename, mode) as fout:
-            if output_format == FORMAT_BIN:
-                self.write_binary(fout)
-            elif output_format == FORMAT_IHEX:
-                self.write_ihex(fout, bytes_per_line=bytes_per_line)
-            elif output_format == FORMAT_SREC:
-                self.write_srec(fout, bytes_per_line=bytes_per_line, show_count=show_count)
-            else:
-                self.write_hexdump(fout)
+        if output_format == FORMAT_BIN:
+            self.write_binary(fout)
+        elif output_format == FORMAT_SREC:
+            self.write_srec(fout, bytes_per_line=bytes_per_line)
+        elif output_format == FORMAT_SREC_WITH_REC_COUNT:
+            self.write_srec(fout, bytes_per_line=bytes_per_line, show_count=True)
+        elif output_format == FORMAT_IHEX:
+            self.write_ihex(fout, bytes_per_line=bytes_per_line)
+        else:
+            self.write_hexdump(fout)
 
     def write_binary(self, fout):
         """Write the memory to a binary file."""
@@ -368,28 +372,6 @@ class Memory:
             print(_srectext(_SREC_FLIP_VALUE - rectype, self.start_address, b''), file=fout)
 
 
-def format_from_extension(filename: str) -> str:
-    """Return a file format based on the filename extension.
-
-    filename = Name of the output file.
-    """
-    (_, extension) = os.path.splitext(filename)
-    if extension:
-        extension = extension[1:]
-    if extension:
-        if extension in ['bin', 'dat', 'raw']:
-            return FORMAT_BIN
-        if extension in ['exo', 'mot', 'mxt', 's', 's1', 's19',
-                         's2', 's28', 's3', 's37', 'srec', 'sx']:
-            return FORMAT_SREC
-        if extension in ['a43', 'a90', 'h86', 'hex', 'hxh', 'hxl',
-                         'ihe', 'ihex', 'ihx', 'mcs', 'obh', 'obl']:
-            return FORMAT_IHEX
-        if re.match(r'p[0-9A-Fa-f]{2}', extension):
-            return FORMAT_IHEX
-    return FORMAT_DUMP
-
-
 def _dumptext(address: int, data: bytes) -> str:
     """Return a hex dump record"""
     hextext = data.hex(' ').ljust(47)
@@ -426,25 +408,19 @@ def _parse_srec_line(hextext: str) -> tuple[int, int, bytes]:
     if recordsum != 255:
         checksum = record[-1]
         expected_checksum = ((recordsum - checksum) & 255) ^ 255
-        raise ChecksumError(f'Record "{hextext}" has invalid checksum. '
-                            f'Expected 0x{expected_checksum:02X}. '
-                            f'Actual value was 0x{checksum:02X}.')
+        colnum = len(hextext) - 2
+        raise ChecksumError(expected_checksum, checksum, colnum)
     count = record[1]
     expected_count = len(record) - 2
     if count != expected_count:
-        raise RecordLengthError(f'Record "{hextext}" data length ({expected_count}) '
-                                f'does not match specified data length ({count}).')
+        raise RecordLengthError(expected_count, count, 2)
     rectype = record[0]
     if rectype == _SREC_REC_INVALID or rectype >= _SREC_UNSUPPORTED:
-        raise BadRecordValError(f'Record "{hextext}" uses '
-                                f'an unsupported record type ({rectype})')
+        raise BadRecordTypeError(rectype, 0)
     address_length = _EXPECTED_SREC_ADDRESS_LENGTH[rectype]
     expected_count = address_length + 1
     if rectype >= _SREC_A16_COUNT and count != expected_count:
-        raise RecordLengthError(f'Record "{hextext}" has wrong number of '
-                                f'bytes for record type {rectype}. '
-                                f'Expected {expected_count} bytes. '
-                                f'Actually has {count} bytes.')
+        raise RecordTypeLengthError(rectype, expected_count, count, 2)
     address = int.from_bytes(record[2:address_length + 2], byteorder='big')
     data = record[address_length + 2:-1]
     return (rectype, address, data)
@@ -453,28 +429,23 @@ def _parse_srec_line(hextext: str) -> tuple[int, int, bytes]:
 def _parse_ihex_line(hextext: str) -> tuple[int, int, bytes]:
     """Decode a line of Intel Hex formatted text."""
     record = bytes.fromhex(hextext[1:])
-    checksum = record[-1]
-    expected_checksum = (0 - sum(record[:-1])) & 255
-    if checksum != expected_checksum:
-        raise ChecksumError(f'Record "{hextext}" has invalid checksum. '
-                            f'Expected 0x{expected_checksum:02X}. '
-                            f'Actual value was 0x{checksum:02X}.')
+    recordsum = (sum(record) & 255)
+    if recordsum != 0:
+        checksum = record[-1]
+        expected_checksum = (recordsum - checksum) & 255
+        colnum = len(hextext) - 2
+        raise ChecksumError(expected_checksum, checksum, colnum)
     count = record[0]
     expected_count = len(record) - 5
     if count != expected_count:
-        raise RecordLengthError(f'Record "{hextext}" data length ({expected_count}) '
-                                f'does not match specified data length ({count}).')
+        raise RecordLengthError(expected_count, count, 1)
     rectype = record[3]
     if rectype >= _IHEX_UNSUPPORTED:
-        raise BadRecordValError(f'Record "{hextext}" uses '
-                                f'an unsupported record type ({rectype}).')
+        raise BadRecordTypeError(rectype, 7)
     if rectype != 0:
         expected_count = _EXPECTED_IHEX_DATA_COUNT[rectype]
         if count != expected_count:
-            raise RecordLengthError(f'Record "{hextext}" has wrong number of '
-                                    f'bytes for record type {rectype}. '
-                                    f'Expected {expected_count} data bytes. '
-                                    f'Actually had {count} data bytes.')
+            raise RecordTypeLengthError(rectype, expected_count, count, 1)
     address = int.from_bytes(record[1:3], byteorder='big')
     data = record[4:-1]
     return (rectype, address, data)

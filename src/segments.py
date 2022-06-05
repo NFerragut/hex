@@ -48,37 +48,43 @@ class Segments:
             return self._segments[-1].addrhi - self._segments[0].addrlo
         return 0
 
-    def add(self, segments: list[Segment], overwrite: bool = False):
-        """Add segment to the list.
+    def add(self, segments, overwrite=False):
+        """Add segment(s) to the list.
 
         Any adjacent or overlapping segments will be combined.
         The list will be orderd from lowest to highest address when done.
         """
-        if not isinstance(segments, list):
+        if segments is None:
+            return
+        if isinstance(segments, Segment):
             segments = [segments]
+        self._segments.sort(key=lambda x: x.addrlo)
         for segment in segments:
-            if segment is None or segment.size == 0:
+            if segment.size == 0:
+                continue
+            segment = Segment(segment)  # use a copy
+            segment = self._join_connected_segments(segment, overwrite)
+            self._insert_disconnected_segment(segment)
+
+    def _join_connected_segments(self, segment, overwrite) -> Segment:
+        for seg in reversed(self._segments):
+            gap = _compare_segments(seg, segment)
+            if gap != _SEGMENTS_HAVE_GAP:
+                self._segments.remove(seg)
+                seg.add(segment, overwrite)
+                segment = seg
+        return segment
+
+    def _insert_disconnected_segment(self, segment):
+        for index, seg in enumerate(self._segments):
+            if segment.addrlo < seg.addrlo:
+                self._segments.insert(index, segment)
                 return
-            segment = Segment(segment.data, segment.addrlo)  # use a copy
-            self._segments.sort(key=lambda x: x.addrlo)
-            for seg in reversed(self._segments):
-                gap = _compare_segments(seg, segment)
-                if gap != _SEGMENTS_HAVE_GAP:
-                    self._segments.remove(seg)
-                    segment = seg.add(segment, overwrite)
-            for index, seg in enumerate(self._segments):
-                if segment.addrlo < seg.addrlo:
-                    self._segments.insert(index, segment)
-                    return
-            self._segments.append(segment)
+        self._segments.append(segment)
 
     def clear(self):
         """Remove all segments from the list of segments."""
         self._segments.clear()
-
-    def __contains__(self, segment: Segment) -> bool:
-        """Returns True if the list contains the segment object."""
-        return self._segments.__contains__(segment)
 
     def fill(self, fill: bytes):
         """Fill gaps between segments with the fill pattern."""
@@ -88,10 +94,6 @@ class Segments:
             gapdata = fill * fill_repetitions
             gap = Segment(gapdata[:gap_width], seglo.addrhi)
             self.add(gap)
-
-    def __getitem__(self, index) -> Segment:
-        """Get the indexed segment(s) from the list of segments."""
-        return self._segments[index]
 
     def getrange(self, addrlo: int, addrhi: int):
         """Get the memory in the specified range."""
@@ -134,10 +136,6 @@ class Segments:
                     if subseg:
                         keepers.append(subseg)
         self._segments = keepers
-
-    def __reversed__(self) -> Iterator[Segment]:
-        """Return a reverse iterator over the list of segments."""
-        return self._segments.__reversed__()
 
 
 def _compare_segments(seg1: Segment, seg2: Segment):
