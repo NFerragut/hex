@@ -18,6 +18,11 @@ A command-line utility for manipulating hex and binary files.
 """
 _EPILOG = """
 """
+_EXTENSIONS_BIN = ['bin', 'dat', 'raw']
+_EXTENSIONS_IHEX = ['a43', 'a90', 'h86', 'hex', 'hxh', 'hxl',
+                    'ihe', 'ihex', 'ihx', 'mcs', 'obh', 'obl']
+_EXTENSIONS_SREC = ['exo', 'mot', 'mxt', 's', 's1', 's19',
+                    's2', 's28', 's3', 's37', 'srec', 'sx']
 
 
 def main():
@@ -228,13 +233,11 @@ def format_from_extension(filename: str) -> str:
     if extension:
         extension = extension[1:]
     if extension:
-        if extension in ['bin', 'dat', 'raw']:
+        if extension in _EXTENSIONS_BIN:
             return FORMAT_BIN
-        if extension in ['exo', 'mot', 'mxt', 's', 's1', 's19',
-                         's2', 's28', 's3', 's37', 'srec', 'sx']:
+        if extension in _EXTENSIONS_SREC:
             return FORMAT_SREC
-        if extension in ['a43', 'a90', 'h86', 'hex', 'hxh', 'hxl',
-                         'ihe', 'ihex', 'ihx', 'mcs', 'obh', 'obl']:
+        if extension in _EXTENSIONS_IHEX:
             return FORMAT_IHEX
         if re.match(r'p[0-9A-Fa-f]{2}', extension):
             return FORMAT_IHEX
