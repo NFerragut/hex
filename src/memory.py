@@ -432,7 +432,7 @@ def _parse_ihex_line(hextext: str) -> tuple[int, int, bytes]:
     recordsum = (sum(record) & 255)
     if recordsum != 0:
         checksum = record[-1]
-        expected_checksum = (recordsum - checksum) & 255
+        expected_checksum = (checksum - recordsum) & 255
         colnum = len(hextext) - 2
         raise ChecksumError(expected_checksum, checksum, colnum)
     count = record[0]

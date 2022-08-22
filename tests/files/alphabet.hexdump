@@ -1,4 +1,4 @@
 00000100  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|
 00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|
-80000000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|
-80000010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|
+01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|
+01f00010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|

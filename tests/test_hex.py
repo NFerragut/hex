@@ -40,7 +40,7 @@ class Test0CommandLine():
         assert app.stdoutlines == [
             'usage: hex.py [-h] [--version] [-a] [-d] [-f DATA] [-k [ADDR-ADDR ...]]',
             '              [-r [ADDR-ADDR ...]] [-v VAL[@ADDR] [VAL[@ADDR] ...]]',
-            '              [-w DATA[@ADDR] [DATA[@ADDR] ...]] [-o outfile[@ADDR]]',
+            '              [-w DATA[@ADDR] [DATA[@ADDR] ...]] [-l MB] [-o outfile[@ADDR]]',
             '              [--overwrite] [-B] [-I] [-S] [-c]',
             '              [infile[@ADDR] ...]',
             '',
@@ -64,6 +64,7 @@ class Test0CommandLine():
             '                        write (little-endian) VAL at ADDR or 0',
             '  -w DATA[@ADDR] [DATA[@ADDR] ...], --write-data DATA[@ADDR] [DATA[@ADDR] ...]',
             '                        write (big-endian) DATA at ADDR or 0',
+            '  -l MB, --limit MB     set memory range limit in Megabytes (default 32 MB)',
             '  -o outfile[@ADDR], --output outfile[@ADDR]',
             '                        the file to create with optional relocation ADDR',
             '  --overwrite           overwrite the output file if it exists',
@@ -115,8 +116,8 @@ class Test0ReadInputFiles():
         assert app.stdoutlines == [
             '00000200  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
             '00000210  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
-            '00800000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
-            '00800010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+            '000f0000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '000f0010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -128,8 +129,8 @@ class Test0ReadInputFiles():
         assert app.stdoutlines == [
             '00000100  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
             '00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
-            '80000000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
-            '80000010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '01f00010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -141,8 +142,8 @@ class Test0ReadInputFiles():
         assert app.stdoutlines == [
             '00000100  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
             '00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
-            '80000000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
-            '80000010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '01f00010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -167,8 +168,8 @@ class Test0ReadInputFiles():
         assert app.stdoutlines == [
             '00000100  41 42 43 44 45 46 47 48  31 32 33 34 35 36 37 38  |ABCDEFGH12345678|',
             '00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
-            '80000000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
-            '80000010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '01f00010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -199,10 +200,10 @@ class Test0ReadInputFiles():
             'S30F000001105152535455565758595A88',
             'S315000002004142434445464748494A4B4C4D4E4F5060',
             'S30F000002105152535455565758595A87',
-            'S315008000006162636465666768696A6B6C6D6E6F70E2',
-            'S30F008000107172737475767778797AC9',
-            'S315800000006162636465666768696A6B6C6D6E6F70E2',
-            'S30F800000107172737475767778797AC9',
+            'S315000F00006162636465666768696A6B6C6D6E6F7053',
+            'S30F000F00107172737475767778797A3A',
+            'S31501F000006162636465666768696A6B6C6D6E6F7071',
+            'S30F01F000107172737475767778797A58',
             'S70500200000DA'
         ]
         assert app.stderr == ''
@@ -215,8 +216,8 @@ class Test0ReadInputFiles():
         assert app.stdoutlines == [
             '00000100  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
             '00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
-            '80000000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
-            '80000010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '01f00010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -228,8 +229,8 @@ class Test0ReadInputFiles():
         assert app.stdoutlines == [
             '00000100  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
             '00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
-            '00080000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
-            '00080010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+            '000ff000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '000ff010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -254,8 +255,8 @@ class Test0ReadInputFiles():
         assert app.stdoutlines == [
             '00008100  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
             '00008110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
-            '80008000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
-            '80008010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+            '01f08000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '01f08010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -263,9 +264,9 @@ class Test0ReadInputFiles():
     @staticmethod
     def test_read_and_relocate_out_of_range(app: RunApplication):
         """Input file with address should show an error if memory is not 32-bit addressable."""
-        app.run('tests/files/alphabet.s37@810000E7')
+        app.run('tests/files/alphabet.s37@FE100100')
         assert app.stdout == ''
-        assert app.stderr == 'ERROR: Address used (0x101000000) exceeds 32-bit address space'
+        assert app.stderr == 'ERROR: Address used (0x100000019) exceeds 32-bit address space'
         assert app.returncode == 1
 
     @staticmethod
@@ -275,9 +276,9 @@ class Test0ReadInputFiles():
         assert app.stdout == ''
         assert app.stderrlines == [
             'ERROR: In file "tests/files/bad-checksum.s37" (line 4)',
-            '       S315800000006162636465666768696A6B6C6D6E6F70E3',
+            '       S31501F000006162636465666768696A6B6C6D6E6F7072',
             '                                                   ^^',
-            '       Invalid checksum: calculated 0xE2, but record has 0xE3'
+            '       Invalid checksum: calculated 0x71, but record has 0x72'
         ]
         assert app.returncode == 1
 
@@ -288,7 +289,7 @@ class Test0ReadInputFiles():
         assert app.stdout == ''
         assert app.stderrlines == [
             'ERROR: In file "tests/files/long-record.s37" (line 5)',
-            '       S30F800000107172737475767778797AC900',
+            '       S30F01F000107172737475767778797A5800',
             '         ^^',
             '       Invalid byte count: record has 0x10 bytes, but count set to 0x0F bytes'
         ]
@@ -329,7 +330,7 @@ class Test0ReadInputFiles():
             'ERROR: In file "tests/files/bad-checksum.hex" (line 4)',
             '       :100000006162636465666768696A6B6C6D6E6F7069',
             '                                                ^^',
-            '       Invalid checksum: calculated 0x98, but record has 0x69'
+            '       Invalid checksum: calculated 0x68, but record has 0x69'
         ]
         assert app.returncode == 1
 
@@ -353,7 +354,7 @@ class Test0ReadInputFiles():
         assert app.stdout == ''
         assert app.stderrlines == [
             'ERROR: In file "tests/files/bad-record-type.hex" (line 3)',
-            '       :02000006800078',
+            '       :0200000601F007',
             '              ^^',
             '       Invalid record type: 6 is not a valid record type'
         ]
@@ -395,6 +396,17 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
+    def test_create_data_at_multiple_addresses(app: RunApplication, opt_write_data):
+        """Create multiple data with address should insert data in memory at specified address."""
+        app.run(opt_write_data, 'ffeeddccbbaa@00', '665544332211@10')
+        assert app.stdoutlines == [
+            '00000000  ff ee dd cc bb aa                                 |......|',
+            '00000010  66 55 44 33 22 11                                 |fUD3".|'
+        ]
+        assert app.stderr == ''
+        assert app.returncode == 0
+
+    @staticmethod
     def test_create_data_at_address_out_of_range(app: RunApplication, opt_write_data):
         """Create data option should show an error if memory is not 32-bit addressable."""
         app.run(opt_write_data, '4142434445464748494A4b4C4d4E4f50@FFFFFFFC')
@@ -431,11 +443,11 @@ class Test1ModifyMemoryOptions():
         """Fill option should fill memory gaps."""
         app.run('tests/files/alpha-gap.s37', opt_fill, '3A2d29')
         assert app.stdoutlines == [
-            '7fffffd0  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
-            '7fffffe0  51 52 53 54 55 56 57 58  59 5a 3a 2d 29 3a 2d 29  |QRSTUVWXYZ:-):-)|',
-            '7ffffff0  3a 2d 29 3a 2d 29 3a 2d  29 3a 2d 29 3a 2d 29 3a  |:-):-):-):-):-):|',
-            '80000000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
-            '80000010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+            '01efffd0  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
+            '01efffe0  51 52 53 54 55 56 57 58  59 5a 3a 2d 29 3a 2d 29  |QRSTUVWXYZ:-):-)|',
+            '01effff0  3a 2d 29 3a 2d 29 3a 2d  29 3a 2d 29 3a 2d 29 3a  |:-):-):-):-):-):|',
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '01f00010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -444,12 +456,12 @@ class Test1ModifyMemoryOptions():
     def test_keep(app: RunApplication, opt_keep):
         """Keep option should keep selected memory ranges and discard the rest."""
         app.run('tests/files/alphabet.s37',
-                opt_keep, '100-103', '10c-8000000D', '80000016-80000019')
+                opt_keep, '100-103', '10c-01f0000D', '01f00016-01f00019')
         assert app.stdoutlines == [
             '00000100  41 42 43 44                                       |ABCD|',
             '0000010c  4d 4e 4f 50 51 52 53 54  55 56 57 58 59 5a        |MNOPQRSTUVWXYZ|',
-            '80000000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e        |abcdefghijklmn|',
-            '80000016  77 78 79 7a                                       |wxyz|'
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e        |abcdefghijklmn|',
+            '01f00016  77 78 79 7a                                       |wxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -486,12 +498,12 @@ class Test1ModifyMemoryOptions():
     def test_remove(app: RunApplication, opt_remove):
         """Remove option should remove selected memory ranges and keep the rest."""
         app.run('tests/files/alphabet.s37',
-                opt_remove, '104-10B', '116-80000003', '8000000e-80000015')
+                opt_remove, '104-10B', '116-1f00003', '01f0000e-01f00015')
         assert app.stdoutlines == [
             '00000100  41 42 43 44                                       |ABCD|',
             '0000010c  4d 4e 4f 50 51 52 53 54  55 56                    |MNOPQRSTUV|',
-            '80000004  65 66 67 68 69 6a 6b 6c  6d 6e                    |efghijklmn|',
-            '80000016  77 78 79 7a                                       |wxyz|'
+            '01f00004  65 66 67 68 69 6a 6b 6c  6d 6e                    |efghijklmn|',
+            '01f00016  77 78 79 7a                                       |wxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -503,8 +515,8 @@ class Test1ModifyMemoryOptions():
         assert app.stdoutlines == [
             '00000101  42 43 44 45 46 47 48 49  4a 4b 4c 4d 4e 4f 50 51  |BCDEFGHIJKLMNOPQ|',
             '00000111  52 53 54 55 56 57 58 59  5a                       |RSTUVWXYZ|',
-            '80000000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
-            '80000010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '01f00010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -517,6 +529,44 @@ class Test1ModifyMemoryOptions():
         assert app.stderr == 'WARNING: No output memory -- all memory removed by user options'
         assert app.returncode == 0
 
+    @staticmethod
+    def test_equal_32m_default_memory_span(app: RunApplication):
+        """Hex should not generate an error if memory span is equal to 32M."""
+        app.run('--write-data', '00@0', 'ff@1ffffff')
+        assert app.stdoutlines == [
+            '00000000  00                                                |.|',
+            '01ffffff  ff                                                |.|'
+        ]
+        assert app.stderr == ''
+        assert app.returncode == 0
+
+    @staticmethod
+    def test_over_32m_default_memory_span(app: RunApplication):
+        """Hex should generate an error if memory span is greater than 32M."""
+        app.run('--write-data', '00@0', 'ff@2000000')
+        assert app.stdout == ''
+        assert app.stderr == 'ERROR: Data span (0x02000001 bytes) exceeds 32MB limit'
+        assert app.returncode == 1
+
+    @staticmethod
+    def test_memory_span_equals_limit(app: RunApplication, opt_limit):
+        """Hex limit should not generate an error message if memory span is equal to limit."""
+        app.run('--write-data', '00@0', 'ff@fffff', opt_limit, '1')
+        assert app.stdoutlines == [
+            '00000000  00                                                |.|',
+            '000fffff  ff                                                |.|'
+        ]
+        assert app.stderr == ''
+        assert app.returncode == 0
+
+    @staticmethod
+    def test_memory_span_over_limit(app: RunApplication, opt_limit):
+        """Hex limit should generate an error message if memory span is equal to limit."""
+        app.run('--write-data', '00@0', 'ff@100000', opt_limit, '1')
+        assert app.stdout == ''
+        assert app.stderr == 'ERROR: Data span (0x00100001 bytes) exceeds 1MB limit'
+        assert app.returncode == 1
+
 
 class Test2FormatOutput():
     """Unit tests focused on formatting the output content."""
@@ -528,8 +578,8 @@ class Test2FormatOutput():
         assert app.stdoutlines == [
             'S315000001004142434445464748494A4B4C4D4E4F5061',
             'S30F000001105152535455565758595A88',
-            'S315800000006162636465666768696A6B6C6D6E6F70E2',
-            'S30F800000107172737475767778797AC9',
+            'S31501F000006162636465666768696A6B6C6D6E6F7071',
+            'S30F01F000107172737475767778797A58',
             'S70520000000DA'
         ]
         assert app.stderr == ''
@@ -542,8 +592,8 @@ class Test2FormatOutput():
         assert app.stdoutlines == [
             'S315000001004142434445464748494A4B4C4D4E4F5061',
             'S30F000001105152535455565758595A88',
-            'S315800000006162636465666768696A6B6C6D6E6F70E2',
-            'S30F800000107172737475767778797AC9',
+            'S31501F000006162636465666768696A6B6C6D6E6F7071',
+            'S30F01F000107172737475767778797A58',
         ]
         assert app.stderr == ''
         assert app.returncode == 0
@@ -555,8 +605,8 @@ class Test2FormatOutput():
         assert app.stdoutlines == [
             'S315000001004142434445464748494A4B4C4D4E4F5061',
             'S30F000001105152535455565758595A88',
-            'S315800000006162636465666768696A6B6C6D6E6F70E2',
-            'S30F800000107172737475767778797AC9',
+            'S31501F000006162636465666768696A6B6C6D6E6F7071',
+            'S30F01F000107172737475767778797A58',
             'S5030004F8',
             'S70520000000DA'
         ]
@@ -570,7 +620,7 @@ class Test2FormatOutput():
         assert app.stdoutlines == [
             ':100100004142434445464748494A4B4C4D4E4F5067',
             ':0A0110005152535455565758595A8E',
-            ':0200000480007A',
+            ':0200000401F009',
             ':100000006162636465666768696A6B6C6D6E6F7068',
             ':0A0010007172737475767778797A4F',
             ':0400000520000000D7',
@@ -586,7 +636,7 @@ class Test2FormatOutput():
         assert app.stdoutlines == [
             ':100100004142434445464748494A4B4C4D4E4F5067',
             ':0A0110005152535455565758595A8E',
-            ':0200000480007A',
+            ':0200000401F009',
             ':100000006162636465666768696A6B6C6D6E6F7068',
             ':0A0010007172737475767778797A4F',
             ':00000001FF'
@@ -601,8 +651,8 @@ class Test2FormatOutput():
         assert app.stdoutlines == [
             '00000100  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
             '00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
-            '80000000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
-            '80000010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '01f00010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
         ]
         assert app.stderr == ''
         assert app.returncode == 0

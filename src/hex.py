@@ -5,6 +5,7 @@ import os
 import re
 import sys
 
+from exception import HexError
 from memory import FORMAT_DUMP, Memory, \
     FORMAT_BIN, FORMAT_IHEX, FORMAT_SREC, FORMAT_SREC_WITH_REC_COUNT, \
     FileContentError
@@ -18,11 +19,27 @@ A command-line utility for manipulating hex and binary files.
 """
 _EPILOG = """
 """
+
+_DEFAULT_LIMIT_MB = 32
 _EXTENSIONS_BIN = ['bin', 'dat', 'raw']
 _EXTENSIONS_IHEX = ['a43', 'a90', 'h86', 'hex', 'hxh', 'hxl',
                     'ihe', 'ihex', 'ihx', 'mcs', 'obh', 'obl']
 _EXTENSIONS_SREC = ['exo', 'mot', 'mxt', 's', 's1', 's19',
                     's2', 's28', 's3', 's37', 'srec', 'sx']
+_MEGABYTE = 1024 * 1024
+
+
+class MemorySpanExceedsLimitError(HexError):
+    """Image exceeded the specified memory range limit (default 32MB)."""
+
+    def __init__(self, span, limit):
+        super().__init__()
+        self.filename = ''
+        self.span = span
+        self.limit = limit
+
+    def __str__(self):
+        return f'ERROR: Data span (0x{self.span:08x} bytes) exceeds {self.limit}MB limit'
 
 
 def main():
@@ -43,24 +60,16 @@ def main():
             if memory.is_empty:
                 print('WARNING: No output memory -- all memory removed by user options',
                       file=sys.stderr)
+            if memory.segments.span > args.limit_bytes:
+                raise MemorySpanExceedsLimitError(memory.segments.span, args.limit)
         write_output(memory, output_file=args.output, output_format=args.output_format,
                      overwrite=args.overwrite)
         sys.exit(0)
     except (FileExistsError, TypeError, ValueError,
-            DataCollisionError, FileContentError) as error:
+            DataCollisionError, MemorySpanExceedsLimitError, FileContentError) as error:
         print(str(error), file=sys.stderr)
     except (FileNotFoundError) as error:
         print(f'ERROR: {error.strerror}: "{error.filename}"', file=sys.stderr)
-    # except FileNotFoundError as err:
-    #     print(f'ERROR: {err.args[1]}', file=sys.stderr)
-    # except FileExistsError as err:
-    #     print(f'ERROR: {err.args[0]}', file=sys.stderr)
-    # except ValueError as err:
-    #     print(f'ERROR: {err.args[0]}', file=sys.stderr)
-    # except FileContentError as err:
-    #     print(f'ERROR: {str(err)}', file=sys.stderr)
-    # except DataCollisionError as err:
-    #     print(f'ERROR: {str(err)}', file=sys.stderr)
     sys.exit(1)
 
 
@@ -83,17 +92,20 @@ def parse_cmdline():
                         metavar='DATA',
                         help='fill unused memory with repeating (big-endian) DATA')
     parser.add_argument('-k', '--keep',
-                        nargs='*', metavar='ADDR-ADDR', default=[],
+                        default=[], metavar='ADDR-ADDR', nargs='*',
                         help='keep data in ADDR-ADDR and discard the rest')
     parser.add_argument('-r', '--remove',
-                        nargs='*', metavar='ADDR-ADDR', default=[],
+                        default=[], metavar='ADDR-ADDR', nargs='*',
                         help='remove data in ADDR-ADDR and keep the rest')
     parser.add_argument('-v', '--write-value',
-                        nargs='+', metavar='VAL[@ADDR]', default=[],
+                        default=[], metavar='VAL[@ADDR]', nargs='+',
                         help='write (little-endian) VAL at ADDR or 0')
     parser.add_argument('-w', '--write-data',
-                        nargs='+', metavar='DATA[@ADDR]', default=[],
+                        default=[], metavar='DATA[@ADDR]', nargs='+',
                         help='write (big-endian) DATA at ADDR or 0')
+    parser.add_argument('-l', '--limit',
+                        default=_DEFAULT_LIMIT_MB, metavar='MB', type=int,
+                        help='set memory range limit in Megabytes (default 32 MB)')
     parser.add_argument('-o', '--output',
                         metavar='outfile[@ADDR]',
                         help='the file to create with optional relocation ADDR')
@@ -113,6 +125,7 @@ def parse_cmdline():
                         action='store_true',
                         help='generate a record count (Motorola S output only)')
     args = parser.parse_args()
+    args.limit_bytes = args.limit * _MEGABYTE
     if args.srec:
         if args.record_count:
             args.output_format = FORMAT_SREC_WITH_REC_COUNT

@@ -54,6 +54,11 @@ def opt_keep(request) -> str:
     """Test all keep option variations."""
     return request.param
 
+@pytest.fixture(params=['-l', '--limit'])
+def opt_limit(request) -> str:
+    """Test all limit option variations."""
+    return request.param
+
 @pytest.fixture(params=['-o', '--output'])
 def opt_output(request) -> str:
     """Test all output option variations."""

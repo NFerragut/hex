@@ -11,6 +11,13 @@
       "args": [
         "tests/htmlcov/index.html"
       ]
+    },
+    {
+      "label": "Python REPL",
+      "type": "shell",
+      "command": "python",
+      "isBackground": false,
+      "args": []
     }
   ]
 }
