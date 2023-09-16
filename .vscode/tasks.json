@@ -18,6 +18,16 @@
       "command": "python",
       "isBackground": false,
       "args": []
+    },
+    {
+      "label": "Build Executable",
+      "type": "shell",
+      "command": "pyInstaller",
+      "args": [
+        "-F",
+        "--specpath", "dist",
+        "src/hex.py"
+      ]
     }
   ]
 }
