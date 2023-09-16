@@ -216,14 +216,20 @@ class Memory:
 
         overwrite_data = Allows new data to overwrite older data
         """
+        force_binary = False
         with open(filename, 'rb') as fin:
             binary = fin.read()
-        text = binary.decode('utf-8', 'strict')
-        self.read_srec(text, overwrite_data=overwrite_data)
-        if not self._segments:
-            self.read_ihex(text, overwrite_data=overwrite_data)
+        try:
+            text = binary.decode('utf-8', 'strict')
+            self.read_srec(text, overwrite_data=overwrite_data)
             if not self._segments:
-                self.read_binary(binary)
+                self.read_ihex(text, overwrite_data=overwrite_data)
+                if not self._segments:
+                    force_binary = True
+        except UnicodeDecodeError:
+            force_binary = True
+        if force_binary:
+            self.read_binary(binary)
 
     def read_binary(self, binary):
         """Replace memory with binary data."""
