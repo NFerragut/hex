@@ -73,6 +73,50 @@ def main():
     sys.exit(1)
 
 
+class AddrAction(argparse.Action):
+    """Accept address ranges and remaining values as input files."""
+    def __call__(self, parser, namespace, values, option_string=None):
+        count = 0
+        while (count < len(values) and
+                re.fullmatch(r'[0-9a-fA-F]+(\-[0-9a-fA-F]+)?', values[count])):
+            count += 1
+        if count:
+            optvalues = getattr(namespace, self.dest)
+            if optvalues:
+                setattr(namespace, self.dest, optvalues.extend(values[:count]))
+            else:
+                setattr(namespace, self.dest, values[:count])
+        else:
+            raise argparse.ArgumentError(self, 'expected at least one argument')
+        if count < len(values):
+            if namespace.input:
+                namespace.input.extend(values[count:])
+            else:
+                namespace.input = values[count:]
+
+
+class DataAction(argparse.Action):
+    """Accept data values and remaining values are input files."""
+    def __call__(self, parser, namespace, values, option_string=None):
+        count = 0
+        while (count < len(values) and
+                re.fullmatch(r'[0-9a-fA-F]+(\@[0-9a-fA-F]+)?', values[count])):
+            count += 1
+        if count:
+            optvalues = getattr(namespace, self.dest)
+            if optvalues:
+                setattr(namespace, self.dest, optvalues.extend(values[:count]))
+            else:
+                setattr(namespace, self.dest, values[:count])
+        else:
+            raise argparse.ArgumentError(self, 'expected at least one argument')
+        if count < len(values):
+            if namespace.input:
+                namespace.input.extend(values[count:])
+            else:
+                namespace.input = values[count:]
+
+
 def parse_cmdline():
     """Parse the application's command-line parameters"""
     parser = argparse.ArgumentParser(description=_DESCRIPTION, epilog=_EPILOG)
@@ -80,7 +124,7 @@ def parse_cmdline():
                         action='version', version=f'{_PROGRAM} version {__version__}',
                         help='show version and exit')
     parser.add_argument('input',
-                        nargs='*', metavar='infile[@ADDR]',
+                        action='extend', metavar='infile[@ADDR]', nargs='*',
                         help='input file with optional relocation ADDR')
     parser.add_argument('-a', '--overwrite-start-address',
                         action='store_true',
@@ -92,20 +136,21 @@ def parse_cmdline():
                         metavar='DATA',
                         help='fill unused memory with repeating (big-endian) DATA')
     parser.add_argument('-k', '--keep',
-                        default=[], metavar='ADDR-ADDR', nargs='*',
+                        action=AddrAction, default=[], metavar='ADDR-ADDR', nargs='+',
                         help='keep data in ADDR-ADDR and discard the rest')
     parser.add_argument('-r', '--remove',
-                        default=[], metavar='ADDR-ADDR', nargs='*',
+                        action=AddrAction, default=[], metavar='ADDR-ADDR', nargs='+',
                         help='remove data in ADDR-ADDR and keep the rest')
     parser.add_argument('-v', '--write-value',
-                        default=[], metavar='VAL[@ADDR]', nargs='+',
+                        action=DataAction, default=[], metavar='VAL[@ADDR]', nargs='+',
                         help='write (little-endian) VAL at ADDR or 0')
     parser.add_argument('-w', '--write-data',
-                        default=[], metavar='DATA[@ADDR]', nargs='+',
+                        action=DataAction, default=[], metavar='DATA[@ADDR]', nargs='+',
                         help='write (big-endian) DATA at ADDR or 0')
     parser.add_argument('-l', '--limit',
                         default=_DEFAULT_LIMIT_MB, metavar='MB', type=int,
-                        help='set memory range limit in Megabytes (default 32 MB)')
+                        help='set memory range limit in Megabytes '
+                            f'(default {_DEFAULT_LIMIT_MB} MB)')
     parser.add_argument('-o', '--output',
                         metavar='outfile[@ADDR]',
                         help='the file to create with optional relocation ADDR')
@@ -124,7 +169,8 @@ def parse_cmdline():
     parser.add_argument('-c', '--record-count',
                         action='store_true',
                         help='generate a record count (Motorola S output only)')
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+    args.input.extend(unknown)
     args.limit_bytes = args.limit * _MEGABYTE
     if args.srec:
         if args.record_count:

@@ -1,7 +1,10 @@
 """Unit tests for the Hex application."""
 
+# pylint: disable=too-many-public-methods
+
 import filecmp
 import os
+import re
 
 from run_application import RunApplication
 
@@ -37,42 +40,42 @@ class Test0CommandLine():
     def test_help(app: RunApplication, opt_help):
         """Hex help option should show help text."""
         app.run(opt_help)
-        assert app.stdoutlines == [
-            'usage: hex.py [-h] [--version] [-a] [-d] [-f DATA] [-k [ADDR-ADDR ...]]',
-            '              [-r [ADDR-ADDR ...]] [-v VAL[@ADDR] [VAL[@ADDR] ...]]',
-            '              [-w DATA[@ADDR] [DATA[@ADDR] ...]] [-l MB] [-o outfile[@ADDR]]',
-            '              [--overwrite] [-B] [-I] [-S] [-c]',
-            '              [infile[@ADDR] ...]',
-            '',
+        assert not _get_mismatch_info(app.stdout, [
+            'usage:', 'hex.py', '[-h]', '[--version]', '[-a]', '[-d]', '[-f DATA]',
+            '[-k ADDR-ADDR [ADDR-ADDR ...]]', '[-r ADDR-ADDR [ADDR-ADDR ...]]',
+            '[-v VAL[@ADDR] [VAL[@ADDR] ...]]', '[-w DATA[@ADDR] [DATA[@ADDR] ...]]',
+            '[-l MB]', '[-o outfile[@ADDR]]', '[--overwrite]', '[-B]', '[-I]', '[-S]',
+            '[-c]', '[infile[@ADDR] ...]',
             'A command-line utility for manipulating hex and binary files.',
-            '',
             'positional arguments:',
-            '  infile[@ADDR]         input file with optional relocation ADDR',
-            '',
+            'infile[@ADDR] input file with optional relocation ADDR',
             'options:',
-            '  -h, --help            show this help message and exit',
-            '  --version             show version and exit',
-            '  -a, --overwrite-start-address',
-            '                        use start address from the last input file',
-            '  -d, --overwrite-data  allow newer overlapping data to overwrite older data',
-            '  -f DATA, --fill DATA  fill unused memory with repeating (big-endian) DATA',
-            '  -k [ADDR-ADDR ...], --keep [ADDR-ADDR ...]',
-            '                        keep data in ADDR-ADDR and discard the rest',
-            '  -r [ADDR-ADDR ...], --remove [ADDR-ADDR ...]',
-            '                        remove data in ADDR-ADDR and keep the rest',
-            '  -v VAL[@ADDR] [VAL[@ADDR] ...], --write-value VAL[@ADDR] [VAL[@ADDR] ...]',
-            '                        write (little-endian) VAL at ADDR or 0',
-            '  -w DATA[@ADDR] [DATA[@ADDR] ...], --write-data DATA[@ADDR] [DATA[@ADDR] ...]',
-            '                        write (big-endian) DATA at ADDR or 0',
-            '  -l MB, --limit MB     set memory range limit in Megabytes (default 32 MB)',
-            '  -o outfile[@ADDR], --output outfile[@ADDR]',
-            '                        the file to create with optional relocation ADDR',
-            '  --overwrite           overwrite the output file if it exists',
-            '  -B, --binary          force binary output (with -o option only)',
-            '  -I, --ihex            force Intel Hex output',
-            '  -S, --srec            force Motorola S output',
-            '  -c, --record-count    generate a record count (Motorola S output only)',
-        ]
+            '-h, --help', 'show this help message and exit',
+            '--version', 'show version and exit',
+            '-a, --overwrite-start-address',
+            'use start address from the last input file',
+            '-d, --overwrite-data',
+            'allow newer overlapping data to overwrite older data',
+            '-f DATA, --fill DATA',
+            'fill unused memory with repeating (big-endian) DATA',
+            '-k ADDR-ADDR [ADDR-ADDR ...], --keep ADDR-ADDR [ADDR-ADDR ...]',
+            'keep data in ADDR-ADDR and discard the rest',
+            '-r ADDR-ADDR [ADDR-ADDR ...], --remove ADDR-ADDR [ADDR-ADDR ...]',
+            'remove data in ADDR-ADDR and keep the rest',
+            '-v VAL[@ADDR] [VAL[@ADDR] ...], --write-value VAL[@ADDR] [VAL[@ADDR] ...]',
+            'write (little-endian) VAL at ADDR or 0',
+            '-w DATA[@ADDR] [DATA[@ADDR] ...],',
+            '--write-data DATA[@ADDR] [DATA[@ADDR] ...]',
+            'write (big-endian) DATA at ADDR or 0',
+            '-l MB, --limit MB', 'set memory range limit in Megabytes (default 32 MB)',
+            '-o outfile[@ADDR], --output outfile[@ADDR]',
+            'the file to create with optional relocation ADDR',
+            '--overwrite', 'overwrite the output file if it exists',
+            '-B, --binary', 'force binary output (with -o option only)',
+            '-I, --ihex', 'force Intel Hex output',
+            '-S, --srec', 'force Motorola S output',
+            '-c, --record-count', 'generate a record count (Motorola S output only)',
+        ])
         assert app.stderr == ''
         assert app.returncode == 0
 
@@ -459,7 +462,7 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 1
 
     @staticmethod
-    def test_fill(app: RunApplication, opt_fill):
+    def test_file_fill(app: RunApplication, opt_fill):
         """Fill option should fill memory gaps."""
         app.run('tests/files/alpha-gap.s37', opt_fill, '3A2d29')
         assert app.stdoutlines == [
@@ -473,7 +476,21 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_keep(app: RunApplication, opt_keep):
+    def test_fill_file(app: RunApplication, opt_fill):
+        """Fill option should fill memory gaps."""
+        app.run(opt_fill, '3A2d29', 'tests/files/alpha-gap.s37')
+        assert app.stdoutlines == [
+            '01efffd0  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
+            '01efffe0  51 52 53 54 55 56 57 58  59 5a 3a 2d 29 3a 2d 29  |QRSTUVWXYZ:-):-)|',
+            '01effff0  3a 2d 29 3a 2d 29 3a 2d  29 3a 2d 29 3a 2d 29 3a  |:-):-):-):-):-):|',
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '01f00010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+        ]
+        assert app.stderr == ''
+        assert app.returncode == 0
+
+    @staticmethod
+    def test_file_keep(app: RunApplication, opt_keep):
         """Keep option should keep selected memory ranges and discard the rest."""
         app.run('tests/files/alphabet.s37',
                 opt_keep, '100-103', '10c-01f0000D', '01f00016-01f00019')
@@ -487,7 +504,21 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_keep_single_byte(app: RunApplication, opt_keep):
+    def test_keep_file(app: RunApplication, opt_keep):
+        """Keep option should keep selected memory ranges and discard the rest."""
+        app.run(opt_keep, '100-103', '10c-01f0000D', '01f00016-01f00019',
+                'tests/files/alphabet.s37')
+        assert app.stdoutlines == [
+            '00000100  41 42 43 44                                       |ABCD|',
+            '0000010c  4d 4e 4f 50 51 52 53 54  55 56 57 58 59 5a        |MNOPQRSTUVWXYZ|',
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e        |abcdefghijklmn|',
+            '01f00016  77 78 79 7a                                       |wxyz|'
+        ]
+        assert app.stderr == ''
+        assert app.returncode == 0
+
+    @staticmethod
+    def test_file_keep_single_byte(app: RunApplication, opt_keep):
         """Keep option should keep a single byte if range does not use dash ('-')."""
         app.run('tests/files/alphabet.s37', opt_keep, '100')
         assert app.stdout == \
@@ -496,7 +527,16 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_keep_whole_segment(app: RunApplication, opt_keep):
+    def test_keep_single_byte_file(app: RunApplication, opt_keep):
+        """Keep option should keep a single byte if range does not use dash ('-')."""
+        app.run(opt_keep, '100', 'tests/files/alphabet.s37')
+        assert app.stdout == \
+            '00000100  41                                                |A|'
+        assert app.stderr == ''
+        assert app.returncode == 0
+
+    @staticmethod
+    def test_file_keep_whole_segment(app: RunApplication, opt_keep):
         """Keep option should keep a intact segment of the memory."""
         app.run('tests/files/alphabet.s37', opt_keep, '100-120')
         assert app.stdoutlines == [
@@ -507,7 +547,18 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_keep_with_empty_result(app: RunApplication, opt_keep):
+    def test_keep_whole_segment_file(app: RunApplication, opt_keep):
+        """Keep option should keep a intact segment of the memory."""
+        app.run(opt_keep, '100-120', 'tests/files/alphabet.s37')
+        assert app.stdoutlines == [
+            '00000100  41 42 43 44 45 46 47 48  49 4a 4b 4c 4d 4e 4f 50  |ABCDEFGHIJKLMNOP|',
+            '00000110  51 52 53 54 55 56 57 58  59 5a                    |QRSTUVWXYZ|',
+        ]
+        assert app.stderr == ''
+        assert app.returncode == 0
+
+    @staticmethod
+    def test_file_keep_with_empty_result(app: RunApplication, opt_keep):
         """Hex keep should generate an error message if all memory is discarded."""
         app.run('tests/files/alphabet.s37', opt_keep, '8000-20000')
         assert app.stdout == ''
@@ -515,7 +566,15 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_remove(app: RunApplication, opt_remove):
+    def test_keep_with_empty_result_file(app: RunApplication, opt_keep):
+        """Hex keep should generate an error message if all memory is discarded."""
+        app.run(opt_keep, '8000-20000', 'tests/files/alphabet.s37')
+        assert app.stdout == ''
+        assert app.stderr == 'WARNING: No output memory -- all memory removed by user options'
+        assert app.returncode == 0
+
+    @staticmethod
+    def test_file_remove(app: RunApplication, opt_remove):
         """Remove option should remove selected memory ranges and keep the rest."""
         app.run('tests/files/alphabet.s37',
                 opt_remove, '104-10B', '116-1f00003', '01f0000e-01f00015')
@@ -529,7 +588,21 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_remove_single_byte(app: RunApplication, opt_remove):
+    def test_remove_file(app: RunApplication, opt_remove):
+        """Remove option should remove selected memory ranges and keep the rest."""
+        app.run(opt_remove, '104-10B', '116-1f00003', '01f0000e-01f00015',
+                'tests/files/alphabet.s37')
+        assert app.stdoutlines == [
+            '00000100  41 42 43 44                                       |ABCD|',
+            '0000010c  4d 4e 4f 50 51 52 53 54  55 56                    |MNOPQRSTUV|',
+            '01f00004  65 66 67 68 69 6a 6b 6c  6d 6e                    |efghijklmn|',
+            '01f00016  77 78 79 7a                                       |wxyz|'
+        ]
+        assert app.stderr == ''
+        assert app.returncode == 0
+
+    @staticmethod
+    def test_file_remove_single_byte(app: RunApplication, opt_remove):
         """Remove option should remove a single byte if range does not use dash ('-')."""
         app.run('tests/files/alphabet.s37', opt_remove, '100')
         assert app.stdoutlines == [
@@ -542,9 +615,30 @@ class Test1ModifyMemoryOptions():
         assert app.returncode == 0
 
     @staticmethod
-    def test_remove_with_empty_result(app: RunApplication, opt_remove):
+    def test_remove_single_byte_file(app: RunApplication, opt_remove):
+        """Remove option should remove a single byte if range does not use dash ('-')."""
+        app.run(opt_remove, '100', 'tests/files/alphabet.s37')
+        assert app.stdoutlines == [
+            '00000101  42 43 44 45 46 47 48 49  4a 4b 4c 4d 4e 4f 50 51  |BCDEFGHIJKLMNOPQ|',
+            '00000111  52 53 54 55 56 57 58 59  5a                       |RSTUVWXYZ|',
+            '01f00000  61 62 63 64 65 66 67 68  69 6a 6b 6c 6d 6e 6f 70  |abcdefghijklmnop|',
+            '01f00010  71 72 73 74 75 76 77 78  79 7a                    |qrstuvwxyz|'
+        ]
+        assert app.stderr == ''
+        assert app.returncode == 0
+
+    @staticmethod
+    def test_file_remove_with_empty_result(app: RunApplication, opt_remove):
         """Hex remove should generate an error message if all memory is removed."""
         app.run('tests/files/alphabet.s37', opt_remove, '0-90000000')
+        assert app.stdout == ''
+        assert app.stderr == 'WARNING: No output memory -- all memory removed by user options'
+        assert app.returncode == 0
+
+    @staticmethod
+    def test_remove_with_empty_result_file(app: RunApplication, opt_remove):
+        """Hex remove should generate an error message if all memory is removed."""
+        app.run(opt_remove, '0-90000000', 'tests/files/alphabet.s37')
         assert app.stdout == ''
         assert app.stderr == 'WARNING: No output memory -- all memory removed by user options'
         assert app.returncode == 0
@@ -813,3 +907,15 @@ class Test3WriteOutputFile():
         assert os.stat(outfile) != outstat
         assert filecmp.cmp(outfile, 'tests/files/alphabet.s37')
         os.remove(outfile)
+
+
+def _get_mismatch_info(search_text:str, items:list[str]) -> tuple:
+    """Check if the text items appear in the lines in order."""
+    text = re.sub(r'\s\s+', ' ', search_text)
+    index = 0
+    for i, item in enumerate(items):
+        try:
+            index = text.index(item, index) + len(item)
+        except ValueError:
+            return (i, item, index)
+    return ()
